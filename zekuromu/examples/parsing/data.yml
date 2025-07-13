@@ -1,0 +1,10 @@
+a: 1
+b: false
+c: toto
+d: 10:23
+e: yes
+f: [ "do", false ]
+g:
+  h: 1
+  i: {}
+  j: null
