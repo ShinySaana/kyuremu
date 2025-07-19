@@ -10,4 +10,6 @@ fn main() {
     let merge = zekuromu::raw::parse_file_as_raw_data(&second_arg_as_path).unwrap();
 
     println!("{:?}", data.recursive_merge(merge));
+
+    println!("{:?}", zekuromu::data::operators::Expr::try_parse(&args[3]));
 }
