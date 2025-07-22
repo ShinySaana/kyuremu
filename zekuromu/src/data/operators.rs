@@ -1,18 +1,17 @@
 //! Operators to enrich, prune, reference, or allow more complex array operations.
 //! Heavily inspired by [spruce](https://github.com/geofffranks/spruce).
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Expr(OperatorName, Vec<Argument>);
 
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Argument {
     StringLiteral(StringLiteral),
     NumberLiteral(NumberLiteral),
     Reference(Reference),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum NumberLiteral {
     Float(String),
     Hex(String),
@@ -20,13 +19,13 @@ pub enum NumberLiteral {
     Bin(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct OperatorName(String);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct StringLiteral(String);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Reference(String);
 
 pub mod parser {
@@ -45,6 +44,7 @@ pub mod parser {
         }
     }
 
+    // TODO: Handle much more than just ascii alphanumeric
     fn at_least_x_alphanumeric_parser<'src>(amount: usize) -> impl Parser<'src, &'src str, Vec<char>> {
         any()
             .filter(char::is_ascii_alphanumeric)
@@ -149,7 +149,7 @@ pub mod parser {
     }
 
     fn string_literal_parser<'src>() -> impl Parser<'src, &'src str, StringLiteral> {
-        at_least_x_alphanumeric_parser(1)
+        at_least_x_alphanumeric_parser(0)
             .map(|v| v.iter().collect::<String>())
             .padded_by(just('"'))
             .map(StringLiteral)

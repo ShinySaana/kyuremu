@@ -16,6 +16,18 @@ pub enum RawData {
     Mapping(HashMap<String, RawData>)
 }
 
+#[derive(Default, Clone, Debug)]
+pub enum OperatorData {
+    #[default]
+    Null,
+    Boolean(bool),
+    Number(f64),
+    String(String),
+    Operator(operators::Expr),
+    Sequence(Vec<OperatorData>),
+    Mapping(HashMap<String, OperatorData>)
+}
+
 impl RawData {
     pub fn recursive_merge(self, other: RawData) -> RawData {
         match self {
@@ -54,5 +66,33 @@ impl RawData {
             _ => other
         }
     }
-}
 
+    pub fn into_operator_data(self) -> OperatorData {
+        match self {
+            RawData::Null => OperatorData::Null,
+            RawData::Boolean(inner) => OperatorData::Boolean(inner),
+            RawData::Number(inner) => OperatorData::Number(inner),
+            RawData::String(inner) => {
+                if let Some(expr) = operators::Expr::try_parse(&inner) {
+                    OperatorData::Operator(expr)
+                } else {
+                    OperatorData::String(inner)
+                }
+            },
+            RawData::Sequence(inner) => {
+                let mut sequence = Vec::with_capacity(inner.len());
+                for item in inner {
+                    sequence.push(item.into_operator_data());
+                }
+                OperatorData::Sequence(sequence)
+            },
+            RawData::Mapping(inner) => {
+                let mut mapping = HashMap::with_capacity(inner.len());
+                for (inner_key, inner_value) in inner {
+                    mapping.insert(inner_key, inner_value.into_operator_data());
+                }
+                OperatorData::Mapping(mapping)
+            }
+        }
+    }
+}

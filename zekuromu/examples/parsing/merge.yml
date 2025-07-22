@@ -1,1 +1,5 @@
-{}
+operators:
+  not_one: "blabla"
+  test: (( test ))
+  another_test: "((another))"
+  with_a_number_argument: "(( witharg 3. ))"
