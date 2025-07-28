@@ -1,9 +1,37 @@
 pub mod operators;
 
-use std::collections::{HashMap, HashSet};
+use std::{borrow::Borrow, collections::{HashMap, HashSet}, hash::Hash};
+
+// Explicitely constrains `Mapping` to only use Strings as keys.
+pub type DataKey = String;
+
+pub trait Traverseable<K> 
+where
+    K: Hash + Eq + ?Sized,
+{
+    fn get<Q>(&self, key: &Q) -> Option<&Self>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized;
+
+    fn get_path<Q>(&self, path: &[&Q]) -> Option<&Self>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
+        if path.is_empty() {
+            return Some(self)
+        } else {
+            let key = path[0];
+            match self.get(key) {
+                Some(inner) => inner.get_path(&path[1..]),
+                None => None
+            }
+        }
+    }
+}
 
 // Any serialized format should implement at least these.
-// Explicitely constrains `Mapping` to only use Strings as keys.
 // TODO: `Number` should be arbitrarily large in practice; left as a float for now.
 #[derive(Default, Clone, Debug)]
 pub enum RawData {
@@ -13,19 +41,7 @@ pub enum RawData {
     Number(f64),
     String(String),
     Sequence(Vec<RawData>),
-    Mapping(HashMap<String, RawData>)
-}
-
-#[derive(Default, Clone, Debug)]
-pub enum OperatorData {
-    #[default]
-    Null,
-    Boolean(bool),
-    Number(f64),
-    String(String),
-    Operator(operators::Expr),
-    Sequence(Vec<OperatorData>),
-    Mapping(HashMap<String, OperatorData>)
+    Mapping(HashMap<DataKey, RawData>)
 }
 
 impl RawData {
@@ -93,6 +109,44 @@ impl RawData {
                 }
                 OperatorData::Mapping(mapping)
             }
+        }
+    }
+}
+
+impl Traverseable<String> for RawData {
+    fn get<Q>(&self, key: &Q) -> Option<&Self>
+    where
+        String: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
+        match self {
+            RawData::Mapping(inner) => inner.get(key),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+pub enum OperatorData {
+    #[default]
+    Null,
+    Boolean(bool),
+    Number(f64),
+    String(String),
+    Operator(operators::Expr),
+    Sequence(Vec<OperatorData>),
+    Mapping(HashMap<DataKey, OperatorData>)
+}
+
+impl Traverseable<DataKey> for OperatorData {
+    fn get<Q>(&self, key: &Q) -> Option<&Self>
+    where
+        DataKey: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
+        match self {
+            OperatorData::Mapping(inner) => inner.get(key),
+            _ => None,
         }
     }
 }
