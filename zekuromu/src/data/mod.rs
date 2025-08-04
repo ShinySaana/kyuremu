@@ -1,33 +1,77 @@
 pub mod operators;
 
-use std::{borrow::Borrow, collections::{HashMap, HashSet}, hash::Hash};
+use std::{collections::{HashMap, HashSet}, hash::Hash, num::ParseIntError};
+
+use crate::data::operators::Reference;
 
 // Explicitely constrains `Mapping` to only use Strings as keys.
-pub type DataKey = String;
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct DataKey(String);
 
-pub trait Traverseable<K> 
-where
-    K: Hash + Eq + ?Sized,
+impl<T> From<T> for DataKey
+where T: Into<String>
 {
-    fn get<Q>(&self, key: &Q) -> Option<&Self>
-    where
-        K: Borrow<Q>,
-        Q: Hash + Eq + ?Sized;
+    fn from(value: T) -> Self {
+        DataKey(value.into())
+    }
+}
 
-    fn get_path<Q>(&self, path: &[&Q]) -> Option<&Self>
-    where
-        K: Borrow<Q>,
-        Q: Hash + Eq + ?Sized,
-    {
-        if path.is_empty() {
-            return Some(self)
-        } else {
-            let key = path[0];
-            match self.get(key) {
-                Some(inner) => inner.get_path(&path[1..]),
-                None => None
+impl TryInto<usize> for DataKey {
+    type Error = ParseIntError;
+    fn try_into(self) -> Result<usize, Self::Error> {
+        self.0.parse()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataKeyPath(Vec<DataKey>);
+
+impl DataKeyPath {
+    pub fn empty() -> Self {
+        DataKeyPath(vec![])
+    }
+}
+
+impl From<DataKey> for DataKeyPath {
+    fn from(value: DataKey) -> Self {
+        DataKeyPath(vec![value])
+    }
+}
+
+impl TryFrom<Reference> for DataKeyPath {
+    type Error = ();
+
+    // Terrible implementation, but that's a start ig
+    // TODO: Supports escaped double quotes, escaped dots, and escaped escapes
+    fn try_from(value: Reference) -> Result<Self, Self::Error> {
+        let mut path = vec![];
+        let mut waiting_for_double_quote = false;
+        let mut current_entry: Vec<char> = vec![];
+
+        for character in value.0.chars() {
+            if character == '"' {
+                if waiting_for_double_quote {
+                    waiting_for_double_quote = false;
+                } else {
+                    waiting_for_double_quote = true;
+                }
+            } else {
+                if character == '.' && !waiting_for_double_quote {
+                    path.push(current_entry.drain(..).collect::<String>().into());
+                } else {
+                    current_entry.push(character);
+                }
             }
         }
+
+        path.push(current_entry.drain(..).collect::<String>().into());
+
+        if waiting_for_double_quote {
+            return Err(())
+        }
+
+        Ok(DataKeyPath(path))
     }
 }
 
@@ -113,19 +157,6 @@ impl RawData {
     }
 }
 
-impl Traverseable<String> for RawData {
-    fn get<Q>(&self, key: &Q) -> Option<&Self>
-    where
-        String: Borrow<Q>,
-        Q: Hash + Eq + ?Sized,
-    {
-        match self {
-            RawData::Mapping(inner) => inner.get(key),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Default, Clone, Debug)]
 pub enum OperatorData {
     #[default]
@@ -136,17 +167,4 @@ pub enum OperatorData {
     Operator(operators::Expr),
     Sequence(Vec<OperatorData>),
     Mapping(HashMap<DataKey, OperatorData>)
-}
-
-impl Traverseable<DataKey> for OperatorData {
-    fn get<Q>(&self, key: &Q) -> Option<&Self>
-    where
-        DataKey: Borrow<Q>,
-        Q: Hash + Eq + ?Sized,
-    {
-        match self {
-            OperatorData::Mapping(inner) => inner.get(key),
-            _ => None,
-        }
-    }
 }

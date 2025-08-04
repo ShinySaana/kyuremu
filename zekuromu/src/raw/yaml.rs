@@ -34,7 +34,7 @@ fn parse_yaml_value(value: &serde_yaml::Value) -> Result<RawData, String> {
 
                 let mapping_value = parse_yaml_value(inner_value)?;
 
-                mapping.insert(mapping_key, mapping_value);
+                mapping.insert(mapping_key.into(), mapping_value);
             }
             Ok(RawData::Mapping(mapping))
         }

@@ -2,7 +2,10 @@
 //! Heavily inspired by [spruce](https://github.com/geofffranks/spruce).
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Expr(OperatorName, Vec<Argument>);
+pub struct Expr {
+    pub name: OperatorName,
+    pub arguments: Vec<Argument>,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Argument {
@@ -20,13 +23,20 @@ pub enum NumberLiteral {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct OperatorName(String);
+pub struct OperatorName(pub String);
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct StringLiteral(String);
+pub struct StringLiteral(pub String);
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Reference(String);
+pub struct Reference(pub String);
+
+impl Reference {
+    // TODO: Support a."b.c" as &["a", "b.c"]
+    pub fn to_path(&self) -> Vec<&str> {
+        return self.0.split(".").collect()
+    }
+}
 
 pub mod parser {
     use super::*;
@@ -185,7 +195,7 @@ pub mod parser {
                 .ignore_then(operator_parser())
                 .then(arguments)
                 .then_ignore(whitespace())
-                .map(|expr| Expr(expr.0, expr.1));
+                .map(|expr| Expr { name: expr.0, arguments: expr.1 });
 
 
             let opening_double_parens = just("((");
