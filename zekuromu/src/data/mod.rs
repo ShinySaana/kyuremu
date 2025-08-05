@@ -1,8 +1,8 @@
 pub mod operators;
 
-use std::{collections::{HashMap, HashSet}, hash::Hash, num::ParseIntError};
+use std::{collections::{HashMap, HashSet}, fmt::Display, hash::Hash, num::ParseIntError, result};
 
-use crate::data::operators::Reference;
+use crate::{data::operators::Reference, operators::{NativeOperator, OperatorParsingError}};
 
 // Explicitely constrains `Mapping` to only use Strings as keys.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -30,6 +30,17 @@ pub struct DataKeyPath(Vec<DataKey>);
 impl DataKeyPath {
     pub fn empty() -> Self {
         DataKeyPath(vec![])
+    }
+}
+
+impl Display for DataKeyPath {
+    // God this is terrible
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let joined = self.0.iter()
+            .map(|item| item.0.clone())
+            .collect::<Vec<String>>()
+            .join("\".\"");
+        write!(f, "\"{}\"", joined)
     }
 }
 
@@ -127,16 +138,16 @@ impl RawData {
         }
     }
 
-    pub fn into_operator_data(self) -> OperatorData {
+    pub fn into_operator_data(self) -> RawOperatorData {
         match self {
-            RawData::Null => OperatorData::Null,
-            RawData::Boolean(inner) => OperatorData::Boolean(inner),
-            RawData::Number(inner) => OperatorData::Number(inner),
+            RawData::Null => RawOperatorData::Null,
+            RawData::Boolean(inner) => RawOperatorData::Boolean(inner),
+            RawData::Number(inner) => RawOperatorData::Number(inner),
             RawData::String(inner) => {
                 if let Some(expr) = operators::Expr::try_parse(&inner) {
-                    OperatorData::Operator(expr)
+                    RawOperatorData::RawOperator(expr)
                 } else {
-                    OperatorData::String(inner)
+                    RawOperatorData::String(inner)
                 }
             },
             RawData::Sequence(inner) => {
@@ -144,19 +155,61 @@ impl RawData {
                 for item in inner {
                     sequence.push(item.into_operator_data());
                 }
-                OperatorData::Sequence(sequence)
+                RawOperatorData::Sequence(sequence)
             },
             RawData::Mapping(inner) => {
                 let mut mapping = HashMap::with_capacity(inner.len());
                 for (inner_key, inner_value) in inner {
                     mapping.insert(inner_key, inner_value.into_operator_data());
                 }
-                OperatorData::Mapping(mapping)
+                RawOperatorData::Mapping(mapping)
             }
         }
     }
 }
 
+#[derive(Default, Clone, Debug)]
+pub enum RawOperatorData {
+    #[default]
+    Null,
+    Boolean(bool),
+    Number(f64),
+    String(String),
+    RawOperator(operators::Expr),
+    Sequence(Vec<RawOperatorData>),
+    Mapping(HashMap<DataKey, RawOperatorData>)
+}
+
+// impl TryInto<OperatorData> for RawOperatorData {
+//     type Error = OperatorParsingError;
+//     fn try_into(self) -> Result<OperatorData, Self::Error> {
+//         match self {
+//             RawOperatorData::Null => Ok(OperatorData::Null),
+//             RawOperatorData::Boolean(inner) => Ok(OperatorData::Boolean(inner)),
+//             RawOperatorData::Number(inner) => Ok(OperatorData::Number(inner)),
+//             RawOperatorData::String(inner) => Ok(OperatorData::String(inner)),
+//             RawOperatorData::RawOperator(inner) => crate::operators::Operator::from_expr(inner),
+//             RawOperatorData::Sequence(inner) => {
+//                 let mut sequence = Vec::with_capacity(inner.len());
+//                 for item in inner {
+//                     let intoed = item.try_into()?;
+//                     sequence.push(intoed);
+//                 }
+//                 Ok(OperatorData::Sequence(sequence))
+//             },
+//             RawOperatorData::Mapping(inner) => {
+//                 let mut mapping = HashMap::with_capacity(inner.len());
+//                 for (inner_key, inner_value) in inner {
+//                     let intoed = inner_value.try_into()?;
+//                     mapping.insert(inner_key, intoed);
+//                 }
+//                 Ok(OperatorData::Mapping(mapping))
+//             }
+//         }
+//     }
+// }
+
+// TODO: Handle all kind of operators, not just native ones.
 #[derive(Default, Clone, Debug)]
 pub enum OperatorData {
     #[default]
@@ -164,7 +217,7 @@ pub enum OperatorData {
     Boolean(bool),
     Number(f64),
     String(String),
-    Operator(operators::Expr),
+    Operator(NativeOperator),
     Sequence(Vec<OperatorData>),
     Mapping(HashMap<DataKey, OperatorData>)
 }
