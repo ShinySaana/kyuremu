@@ -1,29 +1,35 @@
 //! Operators declaration and definition happens here.
 //! Should ultimately support plugins in its API.
 
+use std::rc::Rc;
+
 use crate::data::{operators::{Argument, Expr, Reference, StringLiteral}, DataKeyPath, RawOperatorData};
 
-pub enum OperatorParsingError {
+pub enum OperatorParsingErrorReason {
     NoneMatched,
     NameDoesNotMatch,
     ArgumentsLengthDoesNotMatch,
     ArgumentsTypesDoNotMatch,
 }
 
-pub trait OperatorPayload {
-    fn from_expr(expr: &Expr) -> Result<Self, OperatorParsingError> where Self: Sized;
+pub type OperatorParsingError = (Option<NativeOperator>, OperatorParsingErrorReason);
+
+pub trait OperatorPayload : std::fmt::Debug {
+    fn from_expr(expr: &Expr) -> Result<Self, OperatorParsingErrorReason> where Self: Sized;
     fn execute(&self, data: &mut RawOperatorData, path: &DataKeyPath) -> Result<(), String>;
 } 
 
+#[derive(Debug, Clone)]
 pub struct Operator {
     source: OperatorSource,
-    payload: Box<dyn OperatorPayload>
+    payload: Rc<dyn OperatorPayload>
 }
 
 impl Operator {
 
 }
 
+#[derive(Debug, Clone)]
 enum OperatorSource {
     Native(NativeOperator),
 }
@@ -37,18 +43,18 @@ pub enum NativeOperator {
 // Ok this NEEDS to be smarter I must have had a brain fart somewhere
 // smth smth proc macro?
 impl NativeOperator {
-    fn try_parsing_operator(expr: &Expr) -> Result<Operator, (Option<NativeOperator>, OperatorParsingError)> where Self: Sized {
+    pub fn try_parsing_operator(expr: &Expr) -> Result<Operator, OperatorParsingError> where Self: Sized {
         let maybe_grab = GrabOperator::from_expr(expr);
         match maybe_grab {
             Ok(grab) => { 
                 return Ok(Operator {
                     source: OperatorSource::Native(NativeOperator::Grab),
-                    payload: Box::new(grab)
+                    payload: Rc::new(grab)
                 });
             },
             Err(error) => {
                 match error {
-                    OperatorParsingError::NameDoesNotMatch => {},
+                    OperatorParsingErrorReason::NameDoesNotMatch => {},
                     _ => return Err((Some(NativeOperator::Grab), error))
                 }
             }
@@ -59,18 +65,18 @@ impl NativeOperator {
             Ok(expect) => { 
                 return Ok(Operator {
                     source: OperatorSource::Native(NativeOperator::Expect),
-                    payload: Box::new(expect)
+                    payload: Rc::new(expect)
                 });
             },
             Err(error) => {
                 match error {
-                    OperatorParsingError::NameDoesNotMatch => {},
+                    OperatorParsingErrorReason::NameDoesNotMatch => {},
                     _ => return Err((Some(NativeOperator::Expect), error))
                 }
             }
         };
 
-        Err((None, OperatorParsingError::NoneMatched))
+        Err((None, OperatorParsingErrorReason::NoneMatched))
     }
 }
 
@@ -80,19 +86,19 @@ pub struct GrabOperator {
 }
 
 impl OperatorPayload for GrabOperator {
-    fn from_expr(expr: &Expr) -> Result<Self, OperatorParsingError> where Self: Sized {
+    fn from_expr(expr: &Expr) -> Result<Self, OperatorParsingErrorReason> where Self: Sized {
         if &expr.name.0 != "grab" {
-            return Err(OperatorParsingError::NameDoesNotMatch)
+            return Err(OperatorParsingErrorReason::NameDoesNotMatch)
         }
 
         if expr.arguments.len() != 1 {
-            return Err(OperatorParsingError::ArgumentsLengthDoesNotMatch)
+            return Err(OperatorParsingErrorReason::ArgumentsLengthDoesNotMatch)
         }
 
         let first_arg = expr.arguments.get(1).unwrap();
         match first_arg {
             Argument::Reference(inner) => Ok(GrabOperator { reference: inner.clone() }),
-            _ => Err(OperatorParsingError::ArgumentsTypesDoNotMatch)
+            _ => Err(OperatorParsingErrorReason::ArgumentsTypesDoNotMatch)
         }
     }
 
@@ -107,19 +113,19 @@ pub struct ExpectOperator {
 }
 
 impl OperatorPayload for ExpectOperator {
-    fn from_expr(expr: &Expr) -> Result<Self, OperatorParsingError> where Self: Sized {
+    fn from_expr(expr: &Expr) -> Result<Self, OperatorParsingErrorReason> where Self: Sized {
         if &expr.name.0 != "expect" {
-            return Err(OperatorParsingError::NameDoesNotMatch)
+            return Err(OperatorParsingErrorReason::NameDoesNotMatch)
         }
 
         if expr.arguments.len() != 1 {
-            return Err(OperatorParsingError::ArgumentsLengthDoesNotMatch)
+            return Err(OperatorParsingErrorReason::ArgumentsLengthDoesNotMatch)
         }
 
         let first_arg = expr.arguments.get(1).unwrap();
         match first_arg {
             Argument::StringLiteral(inner) => Ok(ExpectOperator { error_msg: inner.clone() }),
-            _ => Err(OperatorParsingError::ArgumentsTypesDoNotMatch)
+            _ => Err(OperatorParsingErrorReason::ArgumentsTypesDoNotMatch)
         }
     }
 

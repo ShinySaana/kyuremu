@@ -2,7 +2,7 @@ pub mod operators;
 
 use std::{collections::{HashMap, HashSet}, fmt::Display, hash::Hash, num::ParseIntError, result};
 
-use crate::{data::operators::Reference, operators::{NativeOperator, OperatorParsingError}};
+use crate::{data::operators::Reference, operators::{NativeOperator, Operator, OperatorParsingError, OperatorParsingErrorReason}};
 
 // Explicitely constrains `Mapping` to only use Strings as keys.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -180,34 +180,34 @@ pub enum RawOperatorData {
     Mapping(HashMap<DataKey, RawOperatorData>)
 }
 
-// impl TryInto<OperatorData> for RawOperatorData {
-//     type Error = OperatorParsingError;
-//     fn try_into(self) -> Result<OperatorData, Self::Error> {
-//         match self {
-//             RawOperatorData::Null => Ok(OperatorData::Null),
-//             RawOperatorData::Boolean(inner) => Ok(OperatorData::Boolean(inner)),
-//             RawOperatorData::Number(inner) => Ok(OperatorData::Number(inner)),
-//             RawOperatorData::String(inner) => Ok(OperatorData::String(inner)),
-//             RawOperatorData::RawOperator(inner) => crate::operators::Operator::from_expr(inner),
-//             RawOperatorData::Sequence(inner) => {
-//                 let mut sequence = Vec::with_capacity(inner.len());
-//                 for item in inner {
-//                     let intoed = item.try_into()?;
-//                     sequence.push(intoed);
-//                 }
-//                 Ok(OperatorData::Sequence(sequence))
-//             },
-//             RawOperatorData::Mapping(inner) => {
-//                 let mut mapping = HashMap::with_capacity(inner.len());
-//                 for (inner_key, inner_value) in inner {
-//                     let intoed = inner_value.try_into()?;
-//                     mapping.insert(inner_key, intoed);
-//                 }
-//                 Ok(OperatorData::Mapping(mapping))
-//             }
-//         }
-//     }
-// }
+impl TryInto<OperatorData> for RawOperatorData {
+    type Error = OperatorParsingError;
+    fn try_into(self) -> Result<OperatorData, Self::Error> {
+        match self {
+            RawOperatorData::Null => Ok(OperatorData::Null),
+            RawOperatorData::Boolean(inner) => Ok(OperatorData::Boolean(inner)),
+            RawOperatorData::Number(inner) => Ok(OperatorData::Number(inner)),
+            RawOperatorData::String(inner) => Ok(OperatorData::String(inner)),
+            RawOperatorData::RawOperator(inner) => crate::operators::NativeOperator::try_parsing_operator(&inner).map( |it| OperatorData::Operator(it)),
+            RawOperatorData::Sequence(inner) => {
+                let mut sequence = Vec::with_capacity(inner.len());
+                for item in inner {
+                    let intoed = item.try_into()?;
+                    sequence.push(intoed);
+                }
+                Ok(OperatorData::Sequence(sequence))
+            },
+            RawOperatorData::Mapping(inner) => {
+                let mut mapping = HashMap::with_capacity(inner.len());
+                for (inner_key, inner_value) in inner {
+                    let intoed = inner_value.try_into()?;
+                    mapping.insert(inner_key, intoed);
+                }
+                Ok(OperatorData::Mapping(mapping))
+            }
+        }
+    }
+}
 
 // TODO: Handle all kind of operators, not just native ones.
 #[derive(Default, Clone, Debug)]
@@ -217,7 +217,7 @@ pub enum OperatorData {
     Boolean(bool),
     Number(f64),
     String(String),
-    Operator(NativeOperator),
+    Operator(Operator),
     Sequence(Vec<OperatorData>),
     Mapping(HashMap<DataKey, OperatorData>)
 }
