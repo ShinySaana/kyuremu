@@ -15,9 +15,8 @@ pub enum OperatorParsingErrorReason {
 pub type OperatorParsingError = (Option<NativeOperator>, OperatorParsingErrorReason);
 
 pub trait OperatorPayload : std::fmt::Debug {
-    fn from_expr(expr: &Expr) -> Result<Self, OperatorParsingErrorReason> where Self: Sized;
     fn execute(&self, data: &mut RawOperatorData, path: &DataKeyPath) -> Result<(), String>;
-} 
+}
 
 #[derive(Debug, Clone)]
 pub struct Operator {
@@ -43,8 +42,8 @@ pub enum NativeOperator {
 // Ok this NEEDS to be smarter I must have had a brain fart somewhere
 // smth smth proc macro?
 impl NativeOperator {
-    pub fn try_parsing_operator(expr: &Expr) -> Result<Operator, OperatorParsingError> where Self: Sized {
-        let maybe_grab = GrabOperator::from_expr(expr);
+    pub fn try_parsing_operator(expr: &Expr) -> Result<Operator, OperatorParsingError> {
+        let maybe_grab = GrabOperator::try_from(expr);
         match maybe_grab {
             Ok(grab) => { 
                 return Ok(Operator {
@@ -60,7 +59,7 @@ impl NativeOperator {
             }
         };
 
-        let maybe_expect = ExpectOperator::from_expr(expr);
+        let maybe_expect: Result<ExpectOperator, OperatorParsingErrorReason> = ExpectOperator::try_from(expr);
         match maybe_expect {
             Ok(expect) => { 
                 return Ok(Operator {
@@ -85,23 +84,27 @@ pub struct GrabOperator {
     reference: Reference
 }
 
-impl OperatorPayload for GrabOperator {
-    fn from_expr(expr: &Expr) -> Result<Self, OperatorParsingErrorReason> where Self: Sized {
-        if &expr.name.0 != "grab" {
+impl TryFrom<&Expr> for GrabOperator {
+    type Error = OperatorParsingErrorReason;
+
+    fn try_from(value: &Expr) -> Result<Self, Self::Error> {
+        if &value.name.0 != "grab" {
             return Err(OperatorParsingErrorReason::NameDoesNotMatch)
         }
 
-        if expr.arguments.len() != 1 {
+        if value.arguments.len() != 1 {
             return Err(OperatorParsingErrorReason::ArgumentsLengthDoesNotMatch)
         }
 
-        let first_arg = expr.arguments.get(1).unwrap();
+        let first_arg = value.arguments.get(1).unwrap();
         match first_arg {
             Argument::Reference(inner) => Ok(GrabOperator { reference: inner.clone() }),
             _ => Err(OperatorParsingErrorReason::ArgumentsTypesDoNotMatch)
-        }
-    }
+        }    }
+}
 
+
+impl OperatorPayload for GrabOperator {
     fn execute(&self, data: &mut RawOperatorData, path: &DataKeyPath) -> Result<(), String> {
         Err("Unimplemented".into())
     }
@@ -112,24 +115,28 @@ pub struct ExpectOperator {
     error_msg: StringLiteral
 }
 
-impl OperatorPayload for ExpectOperator {
-    fn from_expr(expr: &Expr) -> Result<Self, OperatorParsingErrorReason> where Self: Sized {
-        if &expr.name.0 != "expect" {
+impl TryFrom<&Expr> for ExpectOperator {
+    type Error = OperatorParsingErrorReason;
+
+    fn try_from(value: &Expr) -> Result<Self, Self::Error> {
+        if value.name.0 != "expect" {
             return Err(OperatorParsingErrorReason::NameDoesNotMatch)
         }
 
-        if expr.arguments.len() != 1 {
+        if value.arguments.len() != 1 {
             return Err(OperatorParsingErrorReason::ArgumentsLengthDoesNotMatch)
         }
 
-        let first_arg = expr.arguments.get(1).unwrap();
+        let first_arg = value.arguments.get(1).unwrap();
         match first_arg {
             Argument::StringLiteral(inner) => Ok(ExpectOperator { error_msg: inner.clone() }),
             _ => Err(OperatorParsingErrorReason::ArgumentsTypesDoNotMatch)
         }
     }
+}
 
+impl OperatorPayload for ExpectOperator {
     fn execute(&self, _data: &mut RawOperatorData, path: &DataKeyPath) -> Result<(), String> {
-        Err(format!("At path '{}', expected a value. Provided error message: '{}'", path, self.error_msg.0))
+        Err(format!("At path '{}', expected a value. Message: '{}'", path, self.error_msg.0))
     }
 }
