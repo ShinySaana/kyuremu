@@ -5,10 +5,8 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let first_arg_as_path = Path::new(&args[1]);
 
-    let data = zekuromu::raw::parse_file_as_raw_data(&first_arg_as_path).unwrap();
-    let operator_hydrated = data.into_operator_data();
+    let data: zekuromu::data::RawData = zekuromu::raw::parse_file_as_raw_data(&first_arg_as_path).unwrap();
+    let operator_hydrated = data.into_raw_operator_data();
 
-
-
-    // println!("{:?}", merged.into_operator_data());
+    println!("{:?}", operator_hydrated);
 }

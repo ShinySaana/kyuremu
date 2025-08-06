@@ -10,6 +10,7 @@ pub enum OperatorParsingErrorReason {
     NameDoesNotMatch,
     ArgumentsLengthDoesNotMatch,
     ArgumentsTypesDoNotMatch,
+    Unknown,
 }
 
 pub type OperatorParsingError = (Option<NativeOperator>, OperatorParsingErrorReason);
@@ -20,6 +21,7 @@ pub trait OperatorPayload : std::fmt::Debug {
 
 #[derive(Debug, Clone)]
 pub struct Operator {
+
     source: OperatorSource,
     payload: Rc<dyn OperatorPayload>
 }
@@ -39,41 +41,38 @@ pub enum NativeOperator {
     Expect,
 }
 
-// Ok this NEEDS to be smarter I must have had a brain fart somewhere
-// smth smth proc macro?
+fn try_parse_native<'a, T>(expr: &'a Expr, kind: NativeOperator) -> Option<Result<Operator, OperatorParsingError>>
+where T: TryFrom<&'a Expr, Error = OperatorParsingErrorReason> + OperatorPayload + 'static
+{
+    let maybe_op: Result<Rc<T>, OperatorParsingErrorReason> = expr.try_into().map(|op| Rc::new(op));
+
+    match maybe_op {
+        Ok(op) => Some(Ok( Operator {
+            source: OperatorSource::Native(kind),
+            payload: op
+        })),
+        Err(error) => {
+            match error {
+                OperatorParsingErrorReason::NameDoesNotMatch => None,
+                _ => Some(Err((
+                        Some(kind),
+                        error
+                )))
+            }
+        }
+    }
+}
+
+// Better but still should be a macro at some point
 impl NativeOperator {
     pub fn try_parsing_operator(expr: &Expr) -> Result<Operator, OperatorParsingError> {
-        let maybe_grab = GrabOperator::try_from(expr);
-        match maybe_grab {
-            Ok(grab) => { 
-                return Ok(Operator {
-                    source: OperatorSource::Native(NativeOperator::Grab),
-                    payload: Rc::new(grab)
-                });
-            },
-            Err(error) => {
-                match error {
-                    OperatorParsingErrorReason::NameDoesNotMatch => {},
-                    _ => return Err((Some(NativeOperator::Grab), error))
-                }
-            }
-        };
+        if let Some(operator) = try_parse_native::<GrabOperator>(expr, NativeOperator::Grab) {
+            return operator;
+        }
 
-        let maybe_expect: Result<ExpectOperator, OperatorParsingErrorReason> = ExpectOperator::try_from(expr);
-        match maybe_expect {
-            Ok(expect) => { 
-                return Ok(Operator {
-                    source: OperatorSource::Native(NativeOperator::Expect),
-                    payload: Rc::new(expect)
-                });
-            },
-            Err(error) => {
-                match error {
-                    OperatorParsingErrorReason::NameDoesNotMatch => {},
-                    _ => return Err((Some(NativeOperator::Expect), error))
-                }
-            }
-        };
+        if let Some(operator) = try_parse_native::<ExpectOperator>(expr, NativeOperator::Expect) {
+            return operator;
+        }
 
         Err((None, OperatorParsingErrorReason::NoneMatched))
     }

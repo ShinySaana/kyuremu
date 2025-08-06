@@ -17,5 +17,5 @@ fn main() {
 
     // merged.set_path(&[&String::from("new")], &zekuromu::data::RawData::Null);
 
-    println!("{:?}", merged.into_operator_data());
+    println!("{:?}", merged.into_raw_operator_data());
 }

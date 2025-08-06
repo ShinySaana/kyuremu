@@ -138,7 +138,7 @@ impl RawData {
         }
     }
 
-    pub fn into_operator_data(self) -> RawOperatorData {
+    pub fn into_raw_operator_data(self) -> RawOperatorData {
         match self {
             RawData::Null => RawOperatorData::Null,
             RawData::Boolean(inner) => RawOperatorData::Boolean(inner),
@@ -153,14 +153,14 @@ impl RawData {
             RawData::Sequence(inner) => {
                 let mut sequence = Vec::with_capacity(inner.len());
                 for item in inner {
-                    sequence.push(item.into_operator_data());
+                    sequence.push(item.into_raw_operator_data());
                 }
                 RawOperatorData::Sequence(sequence)
             },
             RawData::Mapping(inner) => {
                 let mut mapping = HashMap::with_capacity(inner.len());
                 for (inner_key, inner_value) in inner {
-                    mapping.insert(inner_key, inner_value.into_operator_data());
+                    mapping.insert(inner_key, inner_value.into_raw_operator_data());
                 }
                 RawOperatorData::Mapping(mapping)
             }
