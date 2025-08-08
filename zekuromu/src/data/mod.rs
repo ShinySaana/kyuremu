@@ -209,7 +209,6 @@ impl TryInto<OperatorData> for RawOperatorData {
     }
 }
 
-// TODO: Handle all kind of operators, not just native ones.
 #[derive(Default, Clone, Debug)]
 pub enum OperatorData {
     #[default]

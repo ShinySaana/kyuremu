@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use crate::data::{operators::{Argument, Expr, Reference, StringLiteral}, DataKeyPath, RawOperatorData};
 
+#[derive(Debug, Clone)]
 pub enum OperatorParsingErrorReason {
     NoneMatched,
     NameDoesNotMatch,
@@ -21,7 +22,6 @@ pub trait OperatorPayload : std::fmt::Debug {
 
 #[derive(Debug, Clone)]
 pub struct Operator {
-
     source: OperatorSource,
     payload: Rc<dyn OperatorPayload>
 }
@@ -95,7 +95,7 @@ impl TryFrom<&Expr> for GrabOperator {
             return Err(OperatorParsingErrorReason::ArgumentsLengthDoesNotMatch)
         }
 
-        let first_arg = value.arguments.get(1).unwrap();
+        let first_arg = value.arguments.get(0).unwrap();
         match first_arg {
             Argument::Reference(inner) => Ok(GrabOperator { reference: inner.clone() }),
             _ => Err(OperatorParsingErrorReason::ArgumentsTypesDoNotMatch)
@@ -126,7 +126,7 @@ impl TryFrom<&Expr> for ExpectOperator {
             return Err(OperatorParsingErrorReason::ArgumentsLengthDoesNotMatch)
         }
 
-        let first_arg = value.arguments.get(1).unwrap();
+        let first_arg = value.arguments.get(0).unwrap();
         match first_arg {
             Argument::StringLiteral(inner) => Ok(ExpectOperator { error_msg: inner.clone() }),
             _ => Err(OperatorParsingErrorReason::ArgumentsTypesDoNotMatch)
