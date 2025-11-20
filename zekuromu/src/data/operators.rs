@@ -1,6 +1,3 @@
-//! Operators to enrich, prune, reference, or allow more complex array operations.
-//! Heavily inspired by [spruce](https://github.com/geofffranks/spruce).
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct Expr {
     pub name: OperatorName,
@@ -29,13 +26,9 @@ pub struct OperatorName(pub String);
 pub struct StringLiteral(pub String);
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Reference(pub String);
+pub struct Reference(pub Vec<String>);
 
 impl Reference {
-    // TODO: Support a."b.c" as &["a", "b.c"]
-    pub fn to_path(&self) -> Vec<&str> {
-        return self.0.split(".").collect()
-    }
 }
 
 pub mod parser {
@@ -165,11 +158,25 @@ pub mod parser {
             .map(StringLiteral)
     }
 
+    // TODO: Support a."b.c" parsing as ["a", "b.c"]
+    // TODO: Support escaped double quotes, escaped dots, and escaped escapes
+    // TODO: Test it
     fn reference_parser<'src>() -> impl Parser<'src, &'src str, Reference> {
         just("&")
             .ignore_then(
                 at_least_x_alphanumeric_parser(1)
                 .map(|v| v.iter().collect::<String>())
+                .then(
+                    just(".")
+                    .ignore_then(at_least_x_alphanumeric_parser(1))
+                    .map(|v| v.iter().collect::<String>())
+                    .repeated()
+                    .collect::<Vec<String>>()
+                )
+                .map(|(first, mut rest)| {
+                    rest.insert(0, first);
+                    rest
+                })
             )
             .map(Reference)
     }

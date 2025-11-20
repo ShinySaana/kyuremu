@@ -1,8 +1,8 @@
 pub mod operators;
 
-use std::{collections::{HashMap, HashSet}, fmt::Display, hash::Hash, num::ParseIntError, result};
+use std::{collections::{HashMap, HashSet}, fmt::Display, hash::Hash, num::ParseIntError};
 
-use crate::{data::operators::Reference, operators::{NativeOperator, Operator, OperatorParsingError, OperatorParsingErrorReason}};
+use crate::{data::{operators::Reference}, operators::{Operator, OperatorParsingError}};
 
 // Explicitely constrains `Mapping` to only use Strings as keys.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -52,37 +52,13 @@ impl From<DataKey> for DataKeyPath {
 
 impl TryFrom<Reference> for DataKeyPath {
     type Error = ();
-
-    // Terrible implementation, but that's a start ig
-    // TODO: Supports escaped double quotes, escaped dots, and escaped escapes
     fn try_from(value: Reference) -> Result<Self, Self::Error> {
-        let mut path = vec![];
-        let mut waiting_for_double_quote = false;
-        let mut current_entry: Vec<char> = vec![];
-
-        for character in value.0.chars() {
-            if character == '"' {
-                if waiting_for_double_quote {
-                    waiting_for_double_quote = false;
-                } else {
-                    waiting_for_double_quote = true;
-                }
-            } else {
-                if character == '.' && !waiting_for_double_quote {
-                    path.push(current_entry.drain(..).collect::<String>().into());
-                } else {
-                    current_entry.push(character);
-                }
-            }
+        let mut builder = Vec::with_capacity(value.0.len());
+        for element in value.0 {
+            let data_key: DataKey = element.into();
+            builder.push(data_key);
         }
-
-        path.push(current_entry.drain(..).collect::<String>().into());
-
-        if waiting_for_double_quote {
-            return Err(())
-        }
-
-        Ok(DataKeyPath(path))
+        Ok(DataKeyPath(builder))
     }
 }
 
@@ -182,13 +158,14 @@ pub enum RawOperatorData {
 
 impl TryInto<OperatorData> for RawOperatorData {
     type Error = OperatorParsingError;
+
     fn try_into(self) -> Result<OperatorData, Self::Error> {
         match self {
             RawOperatorData::Null => Ok(OperatorData::Null),
             RawOperatorData::Boolean(inner) => Ok(OperatorData::Boolean(inner)),
             RawOperatorData::Number(inner) => Ok(OperatorData::Number(inner)),
             RawOperatorData::String(inner) => Ok(OperatorData::String(inner)),
-            RawOperatorData::RawOperator(inner) => crate::operators::NativeOperator::try_parsing_operator(&inner).map( |it| OperatorData::Operator(it)),
+            RawOperatorData::RawOperator(inner) => crate::operators::native::NativeOperator::try_parsing_operator(&inner).map( |it| OperatorData::Operator(it)),
             RawOperatorData::Sequence(inner) => {
                 let mut sequence = Vec::with_capacity(inner.len());
                 for item in inner {

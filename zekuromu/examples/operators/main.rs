@@ -1,6 +1,6 @@
 use std::{env, path::Path};
 
-use zekuromu::{self, data::{operators::Reference, DataKeyPath, OperatorData}};
+use zekuromu::{self, data::OperatorData};
 fn main() {
     let args: Vec<String> = env::args().collect();
     let first_arg_as_path = Path::new(&args[1]);
