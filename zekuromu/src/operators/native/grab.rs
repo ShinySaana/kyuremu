@@ -1,4 +1,4 @@
-use crate::{data::{DataKeyPath, RawOperatorData, operators::{Argument, Expr, Reference}}, operators::{OperatorParsingErrorReason, OperatorPayload}};
+use crate::{data::{DataKeyPath, OperatorData, operators::{Argument, Expr, Reference}}, operators::{OperatorExecutionErrorReason, OperatorExecutionErrorResult, OperatorParsingErrorReason, OperatorPayload, OperatorPriority, OperatorPriorityRank}};
 
 #[derive(Debug, Clone)]
 pub struct GrabOperator {
@@ -24,11 +24,14 @@ impl TryFrom<&Expr> for GrabOperator {
         }    }
 }
 
-
 impl OperatorPayload for GrabOperator {
-    fn execute(&self, data: &mut RawOperatorData, path: &DataKeyPath) -> Result<(), String> {
-        let _ = data;
-        let _ = path;
-        Err("Unimplemented".into())
+    fn execute(&self, data: &mut OperatorData, path: &DataKeyPath) -> OperatorExecutionErrorResult {
+        Err(OperatorExecutionErrorReason::Unimplemented)
+    }
+}
+
+impl OperatorPriority for GrabOperator {
+    fn priority(&self) -> OperatorPriorityRank {
+        OperatorPriorityRank::AfterFirst
     }
 }

@@ -5,7 +5,7 @@
 
 use std::rc::Rc;
 
-use crate::{data::{DataKeyPath, RawOperatorData}, operators::native::NativeOperator};
+use crate::{data::{DataKeyPath, OperatorData}, operators::native::NativeOperator};
 
 pub mod native;
 
@@ -20,18 +20,17 @@ pub enum OperatorParsingErrorReason {
 
 pub type OperatorParsingError = (Option<NativeOperator>, OperatorParsingErrorReason);
 
-pub trait OperatorPayload : std::fmt::Debug {
-    fn execute(&self, data: &mut RawOperatorData, path: &DataKeyPath) -> Result<(), String>;
-}
-
 #[derive(Debug, Clone)]
-pub struct Operator {
-    source: OperatorSource,
-    payload: Rc<dyn OperatorPayload>
+pub enum OperatorExecutionErrorReason {
+    Unimplemented,
+    ReferenceUnavailable,
+    OtherError(String),
 }
 
-impl Operator {
+pub type OperatorExecutionErrorResult = Result<(), OperatorExecutionErrorReason>;
 
+pub trait OperatorPayload : std::fmt::Debug {
+    fn execute(&self, data: &mut OperatorData, path: &DataKeyPath) -> OperatorExecutionErrorResult;
 }
 
 #[derive(Debug, Clone)]
@@ -39,4 +38,33 @@ enum OperatorSource {
     Native(NativeOperator),
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum OperatorPriorityRank {
+    /// Mostly for `param`.
+    First,
+    /// Mostly for setup operators.
+    AfterFirst,
+    /// For most operators.
+    Middle,
+    /// Mostly for array operators.
+    BeforeLast,
+    /// Mostly for `expect`.
+    Last,
+}
 
+pub trait OperatorPriority {
+    fn priority(&self) -> OperatorPriorityRank;
+}
+
+#[derive(Debug, Clone)]
+pub struct Operator {
+    source: OperatorSource,
+    payload: Rc<dyn OperatorPayload>,
+    priority: OperatorPriorityRank,
+}
+
+impl Operator {
+    pub fn execute(&self, data: &mut OperatorData, path: &DataKeyPath) -> OperatorExecutionErrorResult {
+        self.payload.execute(data, path)
+    }
+}

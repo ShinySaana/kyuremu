@@ -2,7 +2,7 @@ pub mod operators;
 
 use std::{collections::{HashMap, HashSet}, fmt::Display, hash::Hash, num::ParseIntError};
 
-use crate::{data::{operators::Reference}, operators::{Operator, OperatorParsingError}};
+use crate::{data::operators::Reference, operators::{Operator, OperatorExecutionErrorReason, OperatorParsingError}};
 
 // Explicitely constrains `Mapping` to only use Strings as keys.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -186,6 +186,14 @@ impl TryInto<OperatorData> for RawOperatorData {
     }
 }
 
+pub struct OperatorDataExecutionError {
+    operator: Operator,
+    at: DataKeyPath,
+    reason: OperatorExecutionErrorReason,
+}
+
+pub type OperatorDataExecutionResult = Result<(), OperatorDataExecutionError>;
+
 #[derive(Default, Clone, Debug)]
 pub enum OperatorData {
     #[default]
@@ -196,4 +204,37 @@ pub enum OperatorData {
     Operator(Operator),
     Sequence(Vec<OperatorData>),
     Mapping(HashMap<DataKey, OperatorData>)
+}
+
+impl OperatorData {
+    pub fn execute_operators(&mut self, path: DataKeyPath) -> OperatorDataExecutionResult {
+        match self {
+            OperatorData::Null => Ok(()),
+            OperatorData::Boolean(_) => Ok(()),
+            OperatorData::Number(_) => Ok(()),
+            OperatorData::String(_) => Ok(()),
+            OperatorData::Operator(inner) => {
+                let op = inner.clone();
+                match op.execute(self, &path) {
+                    Err(error) => {
+                        Err(OperatorDataExecutionError {
+                            operator: op,
+                            at: path,
+                            reason: error
+                        })
+                    }
+                    _ => Ok(()),
+                }
+
+            },
+            OperatorData::Sequence(inner) => {
+                // The length of the current list could change under our feet.
+                // Keep the implementation deterministic, but allow it to be weird.
+                unimplemented!()
+            },
+            OperatorData::Mapping(inner) => {
+                unimplemented!()
+            },
+        }
+    }
 }
